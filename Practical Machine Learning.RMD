@@ -1,0 +1,119 @@
+---
+title: "Machine Learning Project"
+author: "JT"
+date: "1/1/2021"
+output: html_document
+---
+## Summary
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. In this project, the goal is be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. 
+
+They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+The goal of the project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. We look to fit a random forest model to the relevant predictors using cross validation within the training set.
+
+We use the fitted model to predict 20 different test cases at the end of the project.
+
+## Source Data
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+We download the data from these weblinks into the working directory and then import them into R.
+
+
+```{r}
+library(caret)
+library(ggplot2)
+
+#setting the relevant URLs for download
+
+trainfileURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testfileURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+# check to see if the data directory has been created already
+if (!file.exists("data")){
+  dir.create("data")
+  trainDestFile <- paste0(getwd(), "/data/train.csv")
+  testDestFile <- paste0(getwd(), "/data/test.csv")
+  
+  #download the relevant files
+  download.file(trainfileURL, destfile = trainDestFile, method = "curl")
+  download.file(testfileURL, destfile = testDestFile, method = "curl")
+}
+
+#Read in the data files replacing blank fields with NAs
+TrainData <- read.csv("./data/train.csv", na.strings=c('#DIV/0!', '', 'NA'))
+TestData <- read.csv("./data/test.csv", na.strings=c('#DIV/0!', '', 'NA')) 
+```
+
+
+## Cleaning the Data
+
+Given the large number of NAs and some none-relevant variables related to name, ID & timestamps at the start of the data frames, we look to subset the imported data to remove them prior to starting the analysis.
+
+```{r}
+ColumnsUsed <- (colSums(is.na(TrainData)) == 0)
+TrainData <- TrainData[,ColumnsUsed]
+TrainData <- TrainData[,-c(1:5)]
+
+TestData <- TestData[,ColumnsUsed]
+TestData <- TestData[,-c(1:5)]
+```
+
+## Cross Validation
+
+We look to split the TrainData data frame into a training an validation test set. 70% of the data points are allocated to the training data set and 30% are allocated to the validation set.
+
+```{r}
+set.seed(1979)
+
+#Cross Validation
+
+inTrain  <- createDataPartition(y = TrainData$classe, p = 0.7, 
+                                  list = FALSE) 
+training <- TrainData[inTrain,] 
+validation <- TrainData[-inTrain,]
+
+```
+
+
+## Model Building
+
+This project applies a random forest method in building a model on the data set. A reasonably significant level of computation is required to fit the model.
+
+```{r}
+#fit the random forest model to the training data
+model_rf <- train(classe ~ ., data = training, method = "rf",)
+
+#we print out the final model
+model_rf$finalModel
+
+#we use the model to make predictions for the validation training set
+pred_validation_rf <- predict(model_rf, validation)
+```
+
+The model has a 99.86% accuracy rate with < 0.2% error rate. THe 95% confidence interval on accuracy is (99.73%, 99.94%).
+
+We print out the confusion matrix below:
+
+```{r}
+#confusion matrix
+confusionMatrix(as.factor(validation$classe), pred_validation_rf)
+```
+
+## 20 test case preditions
+
+Given the high level of accuracy of the model, we fell comfortable using it to predict for the twenty test cases.
+
+```{r}
+#test RF
+Pred_Test_rf <- predict(model_rf, TestData)
+Pred_Test_rf
+```
+
